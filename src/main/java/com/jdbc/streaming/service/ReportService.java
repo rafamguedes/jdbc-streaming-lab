@@ -11,6 +11,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j
@@ -19,9 +21,12 @@ import java.util.concurrent.atomic.AtomicLong;
 public class ReportService {
 
   private final ItemReportRepository repository;
+  private static final DateTimeFormatter DATE_FORMATTER =
+      DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
 
   @Transactional(readOnly = true)
-  public void generate(OutputStream outputStream) throws Exception {
+  public void generate(OutputStream outputStream, LocalDateTime startDate, LocalDateTime endDate)
+      throws Exception {
 
     AtomicLong counter = new AtomicLong();
 
@@ -70,6 +75,12 @@ public class ReportService {
               writer.write(String.valueOf(item.getItemSellPrice()));
               writer.write(';');
 
+              writer.write(formatDate(item.getItemCreatedAt()));
+              writer.write(';');
+
+              writer.write(formatDate(item.getItemUpdatedAt()));
+              writer.write(';');
+
               writer.write(escape(item.getSupplierName()));
               writer.write(';');
 
@@ -89,10 +100,19 @@ public class ReportService {
             } catch (IOException e) {
               throw new RuntimeException(e);
             }
-          });
+          },
+          startDate,
+          endDate);
 
       writer.flush();
     }
+  }
+
+  private String formatDate(LocalDateTime date) {
+    if (date == null) {
+      return "";
+    }
+    return date.format(DATE_FORMATTER);
   }
 
   private String escape(String value) {

@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Getter
 @NoArgsConstructor
@@ -17,6 +18,9 @@ public class ItemDTO {
 
   private BigDecimal itemBuyPrice;
   private BigDecimal itemSellPrice;
+
+  private LocalDateTime itemCreatedAt;
+  private LocalDateTime itemUpdatedAt;
 
   private String supplierName;
   private String supplierDescription;
