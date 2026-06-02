@@ -14,6 +14,7 @@ import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Slf4j
@@ -25,8 +26,61 @@ public class ReportService {
   private static final DateTimeFormatter DATE_FORMATTER =
       DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
 
+    @Transactional(readOnly = true)
+    public void generateTraditional(
+            OutputStream outputStream,
+            LocalDateTime startDate,
+            LocalDateTime endDate) throws Exception {
+
+        long startTime = System.currentTimeMillis();
+
+        log.info(
+                "Memory before query: {} MB",
+                usedMemoryMB());
+
+        List<ItemDTO> items =
+                repository.findAllItems(
+                        startDate,
+                        endDate);
+
+        log.info(
+                "Memory after query: {} MB",
+                usedMemoryMB());
+
+        try (BufferedWriter writer =
+                     new BufferedWriter(
+                             new OutputStreamWriter(
+                                     outputStream,
+                                     StandardCharsets.UTF_8))) {
+
+            writeHeader(writer);
+
+            for (ItemDTO item : items) {
+                writeCsvLine(writer, item);
+            }
+
+            writer.flush();
+        }
+
+        long endTime = System.currentTimeMillis();
+
+        log.info(
+                """
+                Traditional report finished
+          
+                Records: {}
+                Time: {} ms
+                Memory: {} MB
+                """,
+                items.size(),
+                (endTime - startTime),
+                usedMemoryMB());
+    }
+
   @Transactional(readOnly = true)
-  public void generate(OutputStream outputStream, LocalDateTime startDate, LocalDateTime endDate) throws Exception {
+  public void generateStreaming(OutputStream outputStream, LocalDateTime startDate, LocalDateTime endDate) throws Exception {
+
+    long startTime = System.currentTimeMillis();
 
     AtomicLong counter = new AtomicLong();
 
@@ -37,7 +91,7 @@ public class ReportService {
 
       writeHeader(writer);
 
-      repository.streamItems(
+      repository.findAllStreamItems(
           item -> {
             long current = counter.incrementAndGet();
 
@@ -58,6 +112,20 @@ public class ReportService {
 
       writer.flush();
     }
+
+    long endTime = System.currentTimeMillis();
+
+    log.info(
+        """
+              Streaming report finished
+
+              Records: {}
+              Time: {} ms
+              Memory: {} MB
+              """,
+        counter.get(),
+        (endTime - startTime),
+        usedMemoryMB());
   }
 
   private void writeHeader(BufferedWriter writer) throws IOException {

@@ -10,6 +10,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.function.Consumer;
 
 @Repository
@@ -20,7 +21,7 @@ public class ItemReportRepository {
 
   private final JdbcTemplate jdbcTemplate;
 
-  public void streamItems(
+  public void findAllStreamItems(
       Consumer<ItemDTO> consumer, LocalDateTime startDate, LocalDateTime endDate) {
 
     String sql =
@@ -79,5 +80,52 @@ public class ItemReportRepository {
         rs.getString("supplier_cnpj"),
         rs.getString("supplier_email"),
         rs.getString("supplier_phone"));
+  }
+
+  public List<ItemDTO> findAllItems(LocalDateTime startDate, LocalDateTime endDate) {
+
+    String sql =
+        """
+                SELECT
+                    i.name AS item_name,
+                    i.description AS item_description,
+                    i.quantity AS item_quantity,
+                    i.buy_price AS item_buy_price,
+                    i.sell_price AS item_sell_price,
+                    i.created_at AS item_created_at,
+                    i.updated_at AS item_updated_at,
+                    s.name AS supplier_name,
+                    s.description AS supplier_description,
+                    s.cnpj AS supplier_cnpj,
+                    s.email AS supplier_email,
+                    s.phone AS supplier_phone
+                FROM items i
+                INNER JOIN supplier s ON s.id = i.supplier_id
+                WHERE i.created_at >= ? AND i.created_at <= ?
+                ORDER BY i.name
+                """;
+
+    return jdbcTemplate.query(
+        sql,
+        (rs, rowNum) ->
+            new ItemDTO(
+                rs.getString("item_name"),
+                rs.getString("item_description"),
+                rs.getInt("item_quantity"),
+                rs.getBigDecimal("item_buy_price"),
+                rs.getBigDecimal("item_sell_price"),
+                rs.getTimestamp("item_created_at") != null
+                    ? rs.getTimestamp("item_created_at").toLocalDateTime()
+                    : null,
+                rs.getTimestamp("item_updated_at") != null
+                    ? rs.getTimestamp("item_updated_at").toLocalDateTime()
+                    : null,
+                rs.getString("supplier_name"),
+                rs.getString("supplier_description"),
+                rs.getString("supplier_cnpj"),
+                rs.getString("supplier_email"),
+                rs.getString("supplier_phone")),
+        Timestamp.valueOf(startDate),
+        Timestamp.valueOf(endDate));
   }
 }
