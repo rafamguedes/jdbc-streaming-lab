@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.function.Consumer;
@@ -56,26 +57,27 @@ public class ItemReportRepository {
           return ps;
         },
         rs -> {
-          ItemDTO dto =
-              new ItemDTO(
-                  rs.getString("item_name"),
-                  rs.getString("item_description"),
-                  rs.getInt("item_quantity"),
-                  rs.getBigDecimal("item_buy_price"),
-                  rs.getBigDecimal("item_sell_price"),
-                  rs.getTimestamp("item_created_at") != null
-                      ? rs.getTimestamp("item_created_at").toLocalDateTime()
-                      : null,
-                  rs.getTimestamp("item_updated_at") != null
-                      ? rs.getTimestamp("item_updated_at").toLocalDateTime()
-                      : null,
-                  rs.getString("supplier_name"),
-                  rs.getString("supplier_description"),
-                  rs.getString("supplier_cnpj"),
-                  rs.getString("supplier_email"),
-                  rs.getString("supplier_phone"));
-
+          ItemDTO dto = mapRow(rs);
           consumer.accept(dto);
         });
+  }
+
+  private static ItemDTO mapRow(ResultSet rs) throws SQLException {
+    var createdAt = rs.getTimestamp("item_created_at");
+    var updatedAt = rs.getTimestamp("item_updated_at");
+
+    return new ItemDTO(
+        rs.getString("item_name"),
+        rs.getString("item_description"),
+        rs.getInt("item_quantity"),
+        rs.getBigDecimal("item_buy_price"),
+        rs.getBigDecimal("item_sell_price"),
+        createdAt != null ? createdAt.toLocalDateTime() : null,
+        updatedAt != null ? updatedAt.toLocalDateTime() : null,
+        rs.getString("supplier_name"),
+        rs.getString("supplier_description"),
+        rs.getString("supplier_cnpj"),
+        rs.getString("supplier_email"),
+        rs.getString("supplier_phone"));
   }
 }

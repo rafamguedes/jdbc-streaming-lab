@@ -1,5 +1,6 @@
 package com.jdbc.streaming.service;
 
+import com.jdbc.streaming.dto.ItemDTO;
 import com.jdbc.streaming.repository.ItemReportRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,77 +26,28 @@ public class ReportService {
       DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
 
   @Transactional(readOnly = true)
-  public void generate(OutputStream outputStream, LocalDateTime startDate, LocalDateTime endDate)
-      throws Exception {
+  public void generate(OutputStream outputStream, LocalDateTime startDate, LocalDateTime endDate) throws Exception {
 
     AtomicLong counter = new AtomicLong();
 
-    // BOM UTF-8 to Excel
     outputStream.write(new byte[] {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF});
 
     try (BufferedWriter writer =
         new BufferedWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8))) {
 
-      writer.write(
-          "Produto;"
-              + "Descrição;"
-              + "Quantidade;"
-              + "Preço Compra;"
-              + "Preço Venda;"
-              + "Data Criação;"
-              + "Data Atualização;"
-              + "Fornecedor;"
-              + "Descrição Fornecedor;"
-              + "CNPJ;"
-              + "E-mail;"
-              + "Telefone\n");
+      writeHeader(writer);
 
       repository.streamItems(
           item -> {
             long current = counter.incrementAndGet();
 
-            if (current % 10000 == 0) {
-              log.info("Processed: {} | Memory: {} MB", current, usedMemoryMB());
-            }
-
             try {
+              writeCsvLine(writer, item);
 
-              writer.write(escape(item.getItemName()));
-              writer.write(';');
-
-              writer.write(escape(item.getItemDescription()));
-              writer.write(';');
-
-              writer.write(String.valueOf(item.getItemQuantity()));
-              writer.write(';');
-
-              writer.write(String.valueOf(item.getItemBuyPrice()));
-              writer.write(';');
-
-              writer.write(String.valueOf(item.getItemSellPrice()));
-              writer.write(';');
-
-              writer.write(formatDate(item.getItemCreatedAt()));
-              writer.write(';');
-
-              writer.write(formatDate(item.getItemUpdatedAt()));
-              writer.write(';');
-
-              writer.write(escape(item.getSupplierName()));
-              writer.write(';');
-
-              writer.write(escape(item.getSupplierDescription()));
-              writer.write(';');
-
-              writer.write(escape(item.getSupplierCnpj()));
-              writer.write(';');
-
-              writer.write(escape(item.getSupplierEmail()));
-              writer.write(';');
-
-              writer.write(escape(item.getSupplierPhone()));
-
-              writer.newLine();
+              if (current % 5_000 == 0) {
+                writer.flush();
+                log.info("Processed: {} | Memory: {} MB", current, usedMemoryMB());
+              }
 
             } catch (IOException e) {
               throw new RuntimeException(e);
@@ -108,19 +60,60 @@ public class ReportService {
     }
   }
 
-  private String formatDate(LocalDateTime date) {
-    if (date == null) {
-      return "";
-    }
-    return date.format(DATE_FORMATTER);
+  private void writeHeader(BufferedWriter writer) throws IOException {
+
+    writer.write(
+        "Produto;"
+            + "Descrição;"
+            + "Quantidade;"
+            + "Preço Compra;"
+            + "Preço Venda;"
+            + "Data Criação;"
+            + "Data Atualização;"
+            + "Fornecedor;"
+            + "Descrição Fornecedor;"
+            + "CNPJ;"
+            + "E-mail;"
+            + "Telefone");
+
+    writer.newLine();
+  }
+
+  private void writeCsvLine(BufferedWriter writer, ItemDTO item) throws IOException {
+
+    writeField(writer, escape(item.getItemName()));
+    writeField(writer, escape(item.getItemDescription()));
+    writeField(writer, String.valueOf(item.getItemQuantity()));
+    writeField(writer, String.valueOf(item.getItemBuyPrice()));
+    writeField(writer, String.valueOf(item.getItemSellPrice()));
+    writeField(writer, formatDate(item.getItemCreatedAt()));
+    writeField(writer, formatDate(item.getItemUpdatedAt()));
+    writeField(writer, escape(item.getSupplierName()));
+    writeField(writer, escape(item.getSupplierDescription()));
+    writeField(writer, escape(item.getSupplierCnpj()));
+    writeField(writer, escape(item.getSupplierEmail()));
+
+    writer.write(escape(item.getSupplierPhone()));
+    writer.newLine();
+  }
+
+  private void writeField(BufferedWriter writer, String value) throws IOException {
+    writer.write(value);
+    writer.write(';');
   }
 
   private String escape(String value) {
     if (value == null) {
       return "";
     }
+    return "\"" + value.replace("\"", "\"\"") + "\"";
+  }
 
-    return value.replace(";", ",");
+  private String formatDate(LocalDateTime date) {
+    if (date == null) {
+      return "";
+    }
+    return date.format(DATE_FORMATTER);
   }
 
   private long usedMemoryMB() {

@@ -23,6 +23,6 @@ CREATE TABLE items (
         REFERENCES supplier(id)
 );
 
-CREATE INDEX idx_items_name ON items(name);
-
+CREATE INDEX idx_items_created_at ON items(created_at);
+CREATE INDEX idx_items_created_at_name ON items(created_at, name);
 CREATE INDEX idx_items_supplier_id ON items(supplier_id);
